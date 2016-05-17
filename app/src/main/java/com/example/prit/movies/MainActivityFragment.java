@@ -6,9 +6,13 @@ import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
@@ -28,6 +32,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 
 /**
  * A placeholder fragment containing a simple view.
@@ -37,23 +42,41 @@ public class MainActivityFragment extends Fragment {
     private String[] tempImg={"http://image.tmdb.org/t/p/w185/rDT86hJCxnoOs4ARjrCiRej7pOi.jpg", "http://image.tmdb.org/t/p/w185/k1QUCjNAkfRpWfm1dVJGUmVHzGv.jpg", "http://image.tmdb.org/t/p/w185/zSouWWrySXshPCT4t3UKCQGayyo.jpg", "http://image.tmdb.org/t/p/w185/cGOPbv9wA5gEejkUN892JrveARt.jpg", "http://image.tmdb.org/t/p/w185/dlIPGXPxXQTp9kFrRzn0RsfUelx.jpg", "http://image.tmdb.org/t/p/w185/5TQ6YDmymBpnF005OyoB7ohZps9.jpg", "http://image.tmdb.org/t/p/w185/kqjL17yufvn9OVLyXYpvtyrFfak.jpg"};
 
     private Integer[] tempD={R.drawable.i1, R.drawable.i2, R.drawable.i3, R.drawable.i4, R.drawable.i5,R.drawable.i6, R.drawable.i7};
-
-    public String[] images=null;
-
     private ImageAdapter imageAdapter=null;
 
     public MainActivityFragment() {
     }
 
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setHasOptionsMenu(true);
+    }
+
+    @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        inflater.inflate(R.menu.menu_fragment, menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+
+        int id=item.getItemId();
+        if (id==R.id.action_refresh){
+            updateData();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         View rootView=inflater.inflate(R.layout.fragment_main, container, false);
-        FetchMovieData movieData=new FetchMovieData();
-        movieData.execute("popular");
         GridView gridView=(GridView)rootView.findViewById(R.id.gridview);
-        gridView.setAdapter(new ImageAdapter(getContext()));
+        imageAdapter=new ImageAdapter(getContext());
+        gridView.setAdapter(imageAdapter);
+        updateData();
         return rootView;
     }
 
@@ -62,30 +85,45 @@ public class MainActivityFragment extends Fragment {
         return  connMgr.getActiveNetworkInfo();
     }
 
+    public void updateData(){
+        FetchMovieData movieData=new FetchMovieData();
+        movieData.execute("popular");
+    }
+
 
 
     private class ImageAdapter extends BaseAdapter{
         final String LOG_TAG=ImageAdapter.class.getSimpleName();
         private Context mContext;
+        ArrayList<String> imgLinks;
 
 
         public ImageAdapter(Context c){
             mContext=c;
+            imgLinks=new ArrayList<String>();
         }
 
         @Override
         public int getCount() {
-            return tempImg.length;
+            return imgLinks.size();
         }
 
         @Override
         public Object getItem(int position) {
-            return null;
+            return imgLinks.get(position);
         }
 
         @Override
         public long getItemId(int position) {
-            return 0;
+            return position;
+        }
+
+        public void addAll(String[] strings){
+
+            for (int i=0; i<strings.length; i++){
+                imgLinks.add(strings[i]);
+            }
+            notifyDataSetChanged();
         }
 
         @Override
@@ -100,12 +138,7 @@ public class MainActivityFragment extends Fragment {
 
             NetworkInfo netInfo=getNetworkStatus();
             if (netInfo!=null && netInfo.isConnected()){
-                Log.v(LOG_TAG, "Hey");
-                /*if (images!=null){
-                    Picasso.with(getContext()).load(tempD[position]).noFade().resize(512, 764).into(imageView);
-                    Log.v(LOG_TAG, "Signal is 1");
-                }*/
-                Picasso.with(getContext()).load(tempD[position]).noFade().resize(512, 764).into(imageView);
+                Picasso.with(mContext).load(imgLinks.get(position).toString()).noFade().resize(512, 764).into(imageView);
             }
             else{
                 Toast.makeText(getContext(),"Connection Error!" ,Toast.LENGTH_SHORT).show();
@@ -116,10 +149,12 @@ public class MainActivityFragment extends Fragment {
     }
 
 
+
     private class FetchMovieData extends AsyncTask<String, Void, String[]>{
 
         final String MOVIE_BASE_URL="http://api.themoviedb.org/3/movie/";
         final String API_KEY_PARAM="api_key";
+        final String API_PAGE_PARAM = "page";
         final String API_KEY="5797240513e0940dd87e4768fa6018bc";
 
         final String LOG_TAG=FetchMovieData.class.getSimpleName();
@@ -127,7 +162,7 @@ public class MainActivityFragment extends Fragment {
         public String[] getImgLinks(String movieDataString) throws JSONException{
             final String TAG_RESULTS="results";
             final String TAG_POSTER_PATH="poster_path";
-            final String BASE_IMG_URL=" http://image.tmdb.org/t/p/";
+            final String BASE_IMG_URL="http://image.tmdb.org/t/p/";
             final String IMG_SIZE="w185";
             JSONObject jsonObject=new JSONObject(movieDataString);
             JSONArray jsonArray=jsonObject.getJSONArray(TAG_RESULTS);
@@ -147,16 +182,17 @@ public class MainActivityFragment extends Fragment {
                 return null;
             }
 
-            final String LIST_TYPE_PARAM=params[0]+"?";
+            final String LIST_TYPE_PARAM=params[0];
             InputStream inputStream=null;
             BufferedReader reader=null;
             String movieDataString=null;
             HttpURLConnection connection=null;
 
             try {
-                Uri builtUri=Uri.parse(MOVIE_BASE_URL).buildUpon().appendPath(LIST_TYPE_PARAM).appendQueryParameter(API_KEY_PARAM, API_KEY).build();
-                //URL url=new URL(builtUri.toString());
-                URL url=new URL("http://api.themoviedb.org/3/movie/top_rated?api_key=5797240513e0940dd87e4768fa6018bc");
+                Uri builtUri=Uri.parse(MOVIE_BASE_URL).buildUpon().appendPath(LIST_TYPE_PARAM).appendQueryParameter(API_PAGE_PARAM, String.valueOf(2)).appendQueryParameter(API_KEY_PARAM, API_KEY).build();
+                URL url=new URL(builtUri.toString());
+                Log.v(LOG_TAG, builtUri.toString());
+
                 NetworkInfo netInfo=getNetworkStatus();
                 if (netInfo!=null && netInfo.isConnected()){
                     connection=(HttpURLConnection)url.openConnection();
@@ -215,10 +251,7 @@ public class MainActivityFragment extends Fragment {
         @Override
         protected void onPostExecute(String[] results) {
             if (results!=null){
-                images=results;
-                for (int i=0;i<images.length; i++){
-                    Log.v(LOG_TAG+"2nd", images[i]);
-                }
+                imageAdapter.addAll(results);
             }
         }
     }
