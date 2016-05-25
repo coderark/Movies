@@ -1,2 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources></resources>
+<resources>
+    <string-array name="settings_entries">
+        <item>Popular</item>
+        <item>Top Rated</item>
+    </string-array>
+    <string-array name="settings_entry_values">
+        <item>popular</item>
+        <item>top_rated</item>
+    </string-array>
+</resources>

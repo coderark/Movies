@@ -1,14 +1,11 @@
 package com.example.prit.movies;
 
-import android.net.Uri;
+import android.os.Bundle;
 import android.util.Log;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -17,6 +14,8 @@ import java.util.Date;
  * Created by Prit on 18-05-2016.
  */
 public class Movie {
+
+    public final String EXTRA_MOVIE="MyMovieData";
     private final String LOG_TAG=Movie.class.getSimpleName();
     private final String BASE_POSTER_PATH="http://image.tmdb.org/t/p/";
     private final String POSTER_SIZE="w185";
@@ -37,7 +36,7 @@ public class Movie {
     private final String VIDEO_TAG="video";
     private final String VOTE_AVERAGE_TAG="vote_average";
 
-    public URL POSTER_PATH;
+    public String POSTER_PATH;
     public boolean ADULT;
     public String OVERVIEW;
     public Date RELEASE_DATE;
@@ -46,7 +45,7 @@ public class Movie {
     public String ORIGINAL_TITLE;
     public String ORIGINAL_LANGUAGE;
     public String TITLE;
-    public URL BACKDROP_PATH;
+    public String BACKDROP_PATH;
     public double POPULARITY;
     public int VOTE_COUNT;
     public boolean VIDEO;
@@ -56,7 +55,7 @@ public class Movie {
 
     public Movie(JSONObject jsonObject) throws JSONException{
         try {
-            BuildUrl(jsonObject.getString(POSTER_PATH_TAG));
+            this.POSTER_PATH=BASE_POSTER_PATH+POSTER_SIZE+jsonObject.getString(POSTER_PATH_TAG);
             this.ADULT=jsonObject.getBoolean(ADULT_TAG);
             this.OVERVIEW=jsonObject.getString(OVERVIEW_TAG);
             //this.GENRE_IDS=jsonObject.
@@ -64,32 +63,57 @@ public class Movie {
             this.ORIGINAL_TITLE=jsonObject.getString(ORIGINAL_TITLE_TAG);
             this.ORIGINAL_LANGUAGE=jsonObject.getString(ORIGINAL_LANGUAGE_TAG);
             this.TITLE=jsonObject.getString(TITLE_TAG);
+            this.BACKDROP_PATH=BASE_POSTER_PATH+BACKDROP_SIZE+jsonObject.getString(BACKDROP_PATH_TAG);
             this.POPULARITY=jsonObject.getDouble(POPULARITY_TAG);
             this.VOTE_COUNT=jsonObject.getInt(VOTE_COUNT_TAG);
             this.VIDEO=jsonObject.getBoolean(VIDEO_TAG);
             this.VOTE_AVERAGE=jsonObject.getDouble(VOTE_AVERAGE_TAG);
+            this.RELEASE_DATE=GetDate(jsonObject.getString(RELEASE_DATE_TAG));
         }
-        catch (IOException e){
+        catch (ParseException e){
             Log.e(LOG_TAG, e.getMessage(), e);
         }
     }
 
-    private void BuildUrl(String string) throws MalformedURLException{
-        try {
-            this.POSTER_PATH=new URL(Uri.parse(BASE_POSTER_PATH).buildUpon().appendPath(POSTER_SIZE).appendPath(string).build().toString());
-            this.BACKDROP_PATH=new URL(Uri.parse(BASE_POSTER_PATH).buildUpon().appendPath(BACKDROP_SIZE).appendPath(string).build().toString());
-        }
-        catch (MalformedURLException e){
-            Log.e(LOG_TAG, e.getMessage(), e);
-        }
+    public Movie(Bundle bundle) throws ParseException{
+        POSTER_PATH=bundle.getString(POSTER_PATH_TAG);
+        ADULT=bundle.getBoolean(ADULT_TAG);
+        OVERVIEW=bundle.getString(OVERVIEW_TAG);
+        RELEASE_DATE=GetDate(bundle.getString(RELEASE_DATE_TAG));
+        ID=bundle.getInt(ID_TAG);
+        TITLE=bundle.getString(TITLE_TAG);
+        ORIGINAL_LANGUAGE=bundle.getString(ORIGINAL_LANGUAGE_TAG);
+        POPULARITY=bundle.getDouble(POPULARITY_TAG);
+        VOTE_AVERAGE=bundle.getDouble(VOTE_AVERAGE_TAG);
+        VOTE_COUNT=bundle.getInt(VOTE_COUNT_TAG);
+        VIDEO=bundle.getBoolean(VIDEO_TAG);
     }
 
-    private void GetDate(String string) throws ParseException{
+
+    private Date GetDate(String string) throws ParseException{
         try {
-            this.RELEASE_DATE=new SimpleDateFormat("yyyy-MM-dd").parse(string);
+            return new SimpleDateFormat("yyyy-MM-dd").parse(string);
         }
         catch (ParseException p){
             Log.e(LOG_TAG, "Unable to parse Date");
+            return null;
         }
+    }
+
+    public Bundle toBundle(){
+        Bundle bundle=new Bundle();
+        bundle.putString(POSTER_PATH_TAG, POSTER_PATH);
+        bundle.putBoolean(ADULT_TAG, ADULT);
+        bundle.putString(OVERVIEW_TAG, OVERVIEW);
+        bundle.putString(RELEASE_DATE_TAG, (new SimpleDateFormat("yyyy-MM-dd")).format(RELEASE_DATE));
+        bundle.putInt(ID_TAG, ID);
+        bundle.putString(TITLE_TAG, TITLE);
+        bundle.putString(ORIGINAL_LANGUAGE_TAG, ORIGINAL_LANGUAGE);
+        bundle.putDouble(POPULARITY_TAG, POPULARITY);
+        bundle.putDouble(VOTE_AVERAGE_TAG, VOTE_AVERAGE);
+        bundle.putInt(VOTE_COUNT_TAG, VOTE_COUNT);
+        bundle.putBoolean(VIDEO_TAG, VIDEO);
+
+        return bundle;
     }
 }

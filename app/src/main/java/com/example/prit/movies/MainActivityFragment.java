@@ -1,11 +1,13 @@
 package com.example.prit.movies;
 
 import android.content.Context;
+import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
 import android.util.Log;
@@ -15,6 +17,7 @@ import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.GridView;
 import android.widget.ImageView;
@@ -39,12 +42,14 @@ import java.util.ArrayList;
  */
 public class MainActivityFragment extends Fragment {
 
-    private String[] tempImg={"http://image.tmdb.org/t/p/w185/rDT86hJCxnoOs4ARjrCiRej7pOi.jpg", "http://image.tmdb.org/t/p/w185/k1QUCjNAkfRpWfm1dVJGUmVHzGv.jpg", "http://image.tmdb.org/t/p/w185/zSouWWrySXshPCT4t3UKCQGayyo.jpg", "http://image.tmdb.org/t/p/w185/cGOPbv9wA5gEejkUN892JrveARt.jpg", "http://image.tmdb.org/t/p/w185/dlIPGXPxXQTp9kFrRzn0RsfUelx.jpg", "http://image.tmdb.org/t/p/w185/5TQ6YDmymBpnF005OyoB7ohZps9.jpg", "http://image.tmdb.org/t/p/w185/kqjL17yufvn9OVLyXYpvtyrFfak.jpg"};
-
-    private Integer[] tempD={R.drawable.i1, R.drawable.i2, R.drawable.i3, R.drawable.i4, R.drawable.i5,R.drawable.i6, R.drawable.i7};
     private ImageAdapter imageAdapter=null;
 
+    public ArrayList<Movie> movieList;
+    public int totalPages;
+    private int currentPage=1;
+
     public MainActivityFragment() {
+        movieList=new ArrayList<Movie>();
     }
 
     @Override
@@ -76,6 +81,14 @@ public class MainActivityFragment extends Fragment {
         GridView gridView=(GridView)rootView.findViewById(R.id.gridview);
         imageAdapter=new ImageAdapter(getContext());
         gridView.setAdapter(imageAdapter);
+        gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Intent intent=new Intent(getActivity(), DetailActivity.class);
+                intent.putExtra(imageAdapter.getItem(position).EXTRA_MOVIE, imageAdapter.getItem(position).toBundle());
+                startActivity(intent);
+            }
+        });
         updateData();
         return rootView;
     }
@@ -87,7 +100,7 @@ public class MainActivityFragment extends Fragment {
 
     public void updateData(){
         FetchMovieData movieData=new FetchMovieData();
-        movieData.execute("popular");
+        movieData.execute(currentPage);
     }
 
 
@@ -95,12 +108,12 @@ public class MainActivityFragment extends Fragment {
     private class ImageAdapter extends BaseAdapter{
         final String LOG_TAG=ImageAdapter.class.getSimpleName();
         private Context mContext;
-        ArrayList<String> imgLinks;
+        ArrayList<Movie> imgLinks;
 
 
         public ImageAdapter(Context c){
             mContext=c;
-            imgLinks=new ArrayList<String>();
+            imgLinks=new ArrayList<Movie>();
         }
 
         @Override
@@ -109,7 +122,7 @@ public class MainActivityFragment extends Fragment {
         }
 
         @Override
-        public Object getItem(int position) {
+        public Movie getItem(int position) {
             return imgLinks.get(position);
         }
 
@@ -118,11 +131,8 @@ public class MainActivityFragment extends Fragment {
             return position;
         }
 
-        public void addAll(String[] strings){
-
-            for (int i=0; i<strings.length; i++){
-                imgLinks.add(strings[i]);
-            }
+        public void addAll(ArrayList<Movie> movies){
+            imgLinks.addAll(movies);
             notifyDataSetChanged();
         }
 
@@ -138,7 +148,11 @@ public class MainActivityFragment extends Fragment {
 
             NetworkInfo netInfo=getNetworkStatus();
             if (netInfo!=null && netInfo.isConnected()){
-                Picasso.with(mContext).load(imgLinks.get(position).toString()).noFade().resize(512, 764).into(imageView);
+                if (imgLinks.size()-position<2){
+                    currentPage++;
+                    updateData();
+                }
+                Picasso.with(mContext).load(imgLinks.get(position).POSTER_PATH).placeholder(R.drawable.loading).noFade().resize(512, 764).into(imageView);
             }
             else{
                 Toast.makeText(getContext(),"Connection Error!" ,Toast.LENGTH_SHORT).show();
@@ -150,46 +164,50 @@ public class MainActivityFragment extends Fragment {
 
 
 
-    private class FetchMovieData extends AsyncTask<String, Void, String[]>{
+    private class FetchMovieData extends AsyncTask<Integer, Void, ArrayList<Movie>>{
 
         final String MOVIE_BASE_URL="http://api.themoviedb.org/3/movie/";
         final String API_KEY_PARAM="api_key";
         final String API_PAGE_PARAM = "page";
         final String API_KEY="5797240513e0940dd87e4768fa6018bc";
+        String API_SORTING_PARAM;
 
         final String LOG_TAG=FetchMovieData.class.getSimpleName();
 
-        public String[] getImgLinks(String movieDataString) throws JSONException{
+        public ArrayList<Movie> getImgLinks(String movieDataString) throws JSONException{
             final String TAG_RESULTS="results";
-            final String TAG_POSTER_PATH="poster_path";
-            final String BASE_IMG_URL="http://image.tmdb.org/t/p/";
-            final String IMG_SIZE="w185";
+            final String TAG_TOTAL_PAGES="total_pages";
+
             JSONObject jsonObject=new JSONObject(movieDataString);
             JSONArray jsonArray=jsonObject.getJSONArray(TAG_RESULTS);
+            totalPages=jsonObject.getInt(TAG_TOTAL_PAGES);
             int numResults=jsonArray.length();
-            String[] imgLinks=new String[numResults];
+            ArrayList<Movie> imgLinks=new ArrayList<Movie>();
             for (int i=0;i<numResults; i++){
-                imgLinks[i]=BASE_IMG_URL+IMG_SIZE+jsonArray.getJSONObject(i).getString(TAG_POSTER_PATH);
-                Log.v(LOG_TAG, imgLinks[i]);
+                imgLinks.add(new Movie(jsonArray.getJSONObject(i)));
+                Log.v(LOG_TAG, imgLinks.get(i).POSTER_PATH);
             }
             return  imgLinks;
         }
 
         @Override
-        protected String[] doInBackground(String... params) {
+        protected ArrayList<Movie> doInBackground(Integer... params) {
 
             if (params.length==0){
                 return null;
             }
 
-            final String LIST_TYPE_PARAM=params[0];
+            int page=params[0];
             InputStream inputStream=null;
             BufferedReader reader=null;
             String movieDataString=null;
             HttpURLConnection connection=null;
 
+            API_SORTING_PARAM= PreferenceManager.getDefaultSharedPreferences(getActivity()).getString(getString(R.string.settings_entry_key), getString(R.string.settings_default_entryValue));
+
             try {
-                Uri builtUri=Uri.parse(MOVIE_BASE_URL).buildUpon().appendPath(LIST_TYPE_PARAM).appendQueryParameter(API_PAGE_PARAM, String.valueOf(2)).appendQueryParameter(API_KEY_PARAM, API_KEY).build();
+
+                Uri builtUri=Uri.parse(MOVIE_BASE_URL).buildUpon().appendPath(API_SORTING_PARAM).appendQueryParameter(API_PAGE_PARAM, String.valueOf(page)).appendQueryParameter(API_KEY_PARAM, API_KEY).build();
                 URL url=new URL(builtUri.toString());
                 Log.v(LOG_TAG, builtUri.toString());
 
@@ -249,7 +267,7 @@ public class MainActivityFragment extends Fragment {
         }
 
         @Override
-        protected void onPostExecute(String[] results) {
+        protected void onPostExecute(ArrayList<Movie> results) {
             if (results!=null){
                 imageAdapter.addAll(results);
             }
